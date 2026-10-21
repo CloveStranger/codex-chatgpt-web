@@ -400,6 +400,7 @@ export function createLauncherDevAdapter(
       experimentalSkillAttachments: config.experimentalSkillAttachments,
       experimentalFreshConversationPerTurn: config.experimentalFreshConversationPerTurn,
       useSavedChats: config.useSavedChats,
+      ...(config.chatStartUrl ? { chatStartUrl: config.chatStartUrl } : {}),
       ...(config.experimentalBiggerContext
         ? { experimentalBiggerContext: true }
         : {}),

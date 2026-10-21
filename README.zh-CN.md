@@ -148,6 +148,11 @@ codex-chatgpt-web subagents native
 
 临时聊天是 [ChatGPT 隐私模式](https://help.openai.com/en/articles/8914046-temporary-chat-faq)，提示词仍由 OpenAI 处理。
 
+要让每轮任务在指定的 ChatGPT 页面（例如某个 Project）上开启新会话，可在
+`~/.codex-chatgpt-web/config.json` 中把 `chatStartUrl` 设为该页面的完整
+`https://chatgpt.com/...` 地址。该配置要求启用"保存聊天"，仅接受 ChatGPT 域名，
+且每轮仍会在该页面上新建一个全新会话。
+
 验证范围：[发布验证](docs/release-validation.md)。
 
 本项目是独立软件，与 OpenAI 无关联，也未获得 OpenAI 背书。请仅使用自己的账户，并遵守适用的

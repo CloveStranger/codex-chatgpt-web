@@ -43,6 +43,7 @@ test("daemon streams browser lifecycle through the real helper process", async (
     // Substitute only the browser. Both sides of the production IPC protocol run unchanged.
     ChatGptBrowserWorker.prototype.run = async function(turn) {
       if (this.config.useSavedChats !== true) throw new Error("Saved chat preference lost in helper IPC");
+      if (this.config.chatStartUrl !== "https://chatgpt.com/c/project/ipc-roundtrip") throw new Error("Chat start URL lost in helper IPC");
       if (turn.modelFamily !== "5.6") throw new Error("Pinned model family lost in helper IPC");
       await turn.onPreparedSelected(false);
       const prepared = await turn.prepare();
@@ -104,6 +105,7 @@ test("daemon streams browser lifecycle through the real helper process", async (
     headed: true,
     autoApproveToolCalls: false,
     useSavedChats: true,
+    chatStartUrl: "https://chatgpt.com/c/project/ipc-roundtrip",
   };
   const reasoning: Array<{ text: string; continuation: boolean }> = [];
   const deltas: string[] = [];

@@ -3,9 +3,28 @@ import type { ChatGptWebAccountCapabilities } from "./chatgpt-web-models";
 
 export const CHATGPT_TEMPORARY_CHAT_URL = "https://chatgpt.com/?temporary-chat=true";
 export const CHATGPT_SAVED_CHAT_URL = "https://chatgpt.com/";
+const CHATGPT_HOST_SUFFIX = "chatgpt.com";
 
-export function chatGptNewChatUrl(useSavedChats = false): string {
-  return useSavedChats ? CHATGPT_SAVED_CHAT_URL : CHATGPT_TEMPORARY_CHAT_URL;
+/** A configured start surface must stay inside ChatGPT and must never re-enter Temporary Chat. */
+export function normalizeChatGptChatStartUrl(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    throw new Error(`ChatGPT chat start URL is not a valid absolute URL: ${JSON.stringify(value)}`);
+  }
+  if (url.protocol !== "https:" || url.username || url.password
+    || !(url.hostname === CHATGPT_HOST_SUFFIX || url.hostname.endsWith(`.${CHATGPT_HOST_SUFFIX}`))) {
+    throw new Error(`ChatGPT chat start URL must be an https://${CHATGPT_HOST_SUFFIX} page: ${url.href}`);
+  }
+  if (url.searchParams.get("temporary-chat") === "true") {
+    throw new Error(`ChatGPT chat start URL must not force Temporary Chat: ${url.href}`);
+  }
+  return url.href;
+}
+
+export function chatGptNewChatUrl(useSavedChats = false, chatStartUrl?: string): string {
+  return chatStartUrl || (useSavedChats ? CHATGPT_SAVED_CHAT_URL : CHATGPT_TEMPORARY_CHAT_URL);
 }
 export const CHATGPT_COMPOSER_SELECTOR = [
   '[data-testid="prompt-textarea"]',
@@ -301,12 +320,13 @@ export async function assertTemporaryChatPage(page: Page): Promise<void> {
   await assertNewChatPage(page);
 }
 
-export async function assertNewChatPage(page: Page, useSavedChats = false): Promise<void> {
+export async function assertNewChatPage(page: Page, useSavedChats = false, chatStartUrl?: string): Promise<void> {
   const url = new URL(page.url());
-  const expected = new URL(chatGptNewChatUrl(useSavedChats));
+  const expected = new URL(chatGptNewChatUrl(useSavedChats, chatStartUrl));
   if (url.origin !== expected.origin || url.pathname !== expected.pathname
     || (url.searchParams.get("temporary-chat") === "true") === useSavedChats) {
-    throw new Error(`ChatGPT left the requested new ${useSavedChats ? "saved" : "Temporary"} Chat surface (${page.url()})`);
+    const surfaceName = chatStartUrl ? "configured" : useSavedChats ? "saved" : "Temporary";
+    throw new Error(`ChatGPT left the requested new ${surfaceName} Chat surface (${page.url()})`);
   }
 }
 

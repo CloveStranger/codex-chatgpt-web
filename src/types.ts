@@ -313,5 +313,7 @@ export interface CodexProviderConfig {
     experimentalFreshConversationPerTurn?: boolean;
     /** Use ordinary ChatGPT history for task conversations. Default: Temporary Chat. */
     useSavedChats?: boolean;
+    /** Start each automatic turn on this https://chatgpt.com page, for example a Project. Requires useSavedChats. */
+    chatStartUrl?: string;
   };
 }

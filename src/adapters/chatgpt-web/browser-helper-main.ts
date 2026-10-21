@@ -5,6 +5,7 @@ import type { CodexProviderConfig } from "../../types";
 import { ChatGptBrowserWorker, closeChatGptBrowserWorkers, type BrowserTurn } from "./browser-worker";
 import { ChatGptCompactionHandoffAccepted, ChatGptWebAdapterError } from "./adapter-error";
 import type { ChatGptWebCapabilities } from "./model";
+import { normalizeChatGptChatStartUrl } from "../../chatgpt-session";
 import { createProcessLineWriter } from "./process-line-writer";
 import { createBrowserHelperPromptSelection } from "./browser-helper-prompt-selection";
 import { isChatGptWebMultipartPartCount, type CompiledChatGptWebPrompt } from "./prompt";
@@ -21,6 +22,7 @@ interface RunMessage {
     turnTimeoutMs: number;
     autoApproveToolCalls: boolean;
     useSavedChats?: boolean;
+    chatStartUrl?: string;
   };
   turn: {
     traceId: string;
@@ -187,6 +189,12 @@ async function run(message: RunMessage): Promise<void> {
   if (message.turn.externalProgress !== undefined && typeof message.turn.externalProgress !== "boolean") {
     throw new Error("Browser helper external progress flag is invalid");
   }
+  if (message.config.chatStartUrl !== undefined && typeof message.config.chatStartUrl !== "string") {
+    throw new Error("Browser helper chat start URL is invalid");
+  }
+  const chatStartUrl = message.config.chatStartUrl === undefined
+    ? undefined
+    : normalizeChatGptChatStartUrl(message.config.chatStartUrl);
   const provider: CodexProviderConfig = {
     adapter: "chatgpt-web",
     baseUrl: "https://chatgpt.com",
@@ -198,6 +206,7 @@ async function run(message: RunMessage): Promise<void> {
       turnTimeoutMs: message.config.turnTimeoutMs,
       autoApproveToolCalls: message.config.autoApproveToolCalls,
       useSavedChats: message.config.useSavedChats === true,
+      ...(chatStartUrl ? { chatStartUrl } : {}),
     },
   };
   const abortController = new AbortController();

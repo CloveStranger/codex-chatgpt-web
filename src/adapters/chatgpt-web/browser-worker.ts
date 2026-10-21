@@ -57,6 +57,7 @@ import {
   chatGptNewChatUrl,
   chatGptAssistantTurnSelector,
   chatGptTurnContainerSelector,
+  normalizeChatGptChatStartUrl,
   CHATGPT_ASSISTANT_TURN_SELECTOR,
   CHATGPT_COMPLETION_ACTION_SELECTOR,
   CHATGPT_COMPOSER_SELECTOR,
@@ -1534,6 +1535,7 @@ export interface ResolvedBrowserConfig {
   headed: boolean;
   autoApproveToolCalls: boolean;
   useSavedChats: boolean;
+  chatStartUrl?: string;
 }
 
 export function chatGptTurnIsComplete(state: {
@@ -2302,6 +2304,9 @@ export function resolveBrowserConfig(provider: CodexProviderConfig): ResolvedBro
     && (!Number.isFinite(turnTimeoutMs) || turnTimeoutMs <= 0)) {
     throw new Error("ChatGPT Web turnTimeoutMs must be a positive finite number");
   }
+  if (configured.chatStartUrl !== undefined && configured.useSavedChats !== true) {
+    throw new Error("ChatGPT Web chatStartUrl requires useSavedChats");
+  }
   if (isLegacyChatGptConnectorName(appName)) {
     throw new Error(legacyChatGptConnectorMigrationMessage(appName));
   }
@@ -2317,6 +2322,9 @@ export function resolveBrowserConfig(provider: CodexProviderConfig): ResolvedBro
     headed: configured.headed !== false,
     autoApproveToolCalls: configured.autoApproveToolCalls === true,
     useSavedChats: configured.useSavedChats === true,
+    ...(configured.chatStartUrl !== undefined
+      ? { chatStartUrl: normalizeChatGptChatStartUrl(configured.chatStartUrl) }
+      : {}),
   };
 }
 
@@ -2922,13 +2930,14 @@ export class ChatGptBrowserWorker {
     captureDiagnostic?: (checkpoint: string) => Promise<void>,
     useSavedChats = false,
     abortSignal?: AbortSignal,
+    chatStartUrl?: string,
   ): Promise<Locator> {
     throwIfPromptAttachmentAborted(abortSignal);
     // Launcher verification refreshes its owned page before attaching Playwright so a newly added
     // connector is present in the catalog. Navigating again here destroys that freshly hydrated
     // document and made the first verification race a second SPA bootstrap. A leased turn starts on
     // about:blank and therefore still performs exactly one navigation through this same method.
-    const targetUrl = chatGptNewChatUrl(useSavedChats);
+    const targetUrl = chatGptNewChatUrl(useSavedChats, chatStartUrl);
     if (page.url() !== targetUrl) {
       await withBrowserTurnAbort(page.goto(targetUrl, {
         waitUntil: "domcontentloaded",
@@ -2946,7 +2955,7 @@ export class ChatGptBrowserWorker {
     await captureDiagnostic?.("composer-ready");
     await throwIfChatGptSessionFailureAlert(page);
     await assertAuthenticatedChatGptPage(page);
-    await assertNewChatPage(page, useSavedChats);
+    await assertNewChatPage(page, useSavedChats, chatStartUrl);
     await captureDiagnostic?.("session-verified");
     return composer;
   }
@@ -5540,6 +5549,7 @@ export class ChatGptBrowserWorker {
             checkpoint => diagnostics.capture(page, checkpoint),
             this.config.useSavedChats,
             turn.abortSignal,
+            this.config.chatStartUrl,
           ),
         );
       }
@@ -5766,6 +5776,7 @@ export class ChatGptBrowserWorker {
                 checkpoint => diagnostics.capture(page, checkpoint),
                 this.config.useSavedChats,
                 turn.abortSignal,
+                this.config.chatStartUrl,
               );
               mode = await this.selectModelAndEffort(
                 page,

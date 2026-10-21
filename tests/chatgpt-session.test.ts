@@ -9,6 +9,7 @@ import {
   assertNewChatPage,
   chatGptNewChatUrl,
   detectChatGptAccountCapabilities,
+  normalizeChatGptChatStartUrl,
 } from "../src/chatgpt-session";
 
 test("saved chats start empty and cannot reuse an arbitrary conversation or a Temporary Chat", async () => {
@@ -31,6 +32,46 @@ test("saved chats start empty and cannot reuse an arbitrary conversation or a Te
     url = "https://chatgpt.com/c/previous-task";
     await expect(assertNewChatPage(page, saved)).rejects.toThrow("requested new");
   }
+});
+
+test("a configured chat start URL overrides both turn surfaces and drives navigation", async () => {
+  const projectUrl = "https://chatgpt.com/c/project/turn-surface";
+  expect(chatGptNewChatUrl(false, projectUrl)).toBe(projectUrl);
+  expect(chatGptNewChatUrl(true, projectUrl)).toBe(projectUrl);
+  await assertNewChatPage({ url: () => projectUrl } as any, true, projectUrl);
+  await expect(assertNewChatPage({ url: () => "https://chatgpt.com/" } as any, true, projectUrl))
+    .rejects.toThrow("configured Chat surface");
+  const prepare = (ChatGptBrowserWorker.prototype as any).prepareChatSurface;
+  let url = "https://chatgpt.com/";
+  const navigations: string[] = [];
+  const absent: any = { filter: () => absent, last: () => absent, isVisible: async () => false };
+  const composer: any = { count: async () => 1, nth: () => composer, isVisible: async () => true };
+  const page: any = {
+    url: () => url,
+    goto: async (next: string) => { url = next; navigations.push(next); },
+    locator: (selector: string) => selector === CHATGPT_COMPOSER_SELECTOR ? composer : absent,
+  };
+  expect(await prepare.call(
+    { activeComposer: async () => composer },
+    page,
+    undefined,
+    true,
+    undefined,
+    projectUrl,
+  )).toBe(composer);
+  expect(navigations).toEqual([projectUrl]);
+});
+
+test("chat start URL normalization accepts only https://chatgpt.com pages outside Temporary Chat", () => {
+  expect(normalizeChatGptChatStartUrl(" https://chatgpt.com/c/project/abc ")).toBe("https://chatgpt.com/c/project/abc");
+  expect(normalizeChatGptChatStartUrl("https://chatgpt.com/c/project/abc?model=gpt-5.6-sol"))
+    .toBe("https://chatgpt.com/c/project/abc?model=gpt-5.6-sol");
+  expect(() => normalizeChatGptChatStartUrl("not a url")).toThrow("valid absolute URL");
+  expect(() => normalizeChatGptChatStartUrl("http://chatgpt.com/c/project/abc")).toThrow("https://chatgpt.com page");
+  expect(() => normalizeChatGptChatStartUrl("https://chatgpt.com.evil.com/c/project/abc")).toThrow("https://chatgpt.com page");
+  expect(() => normalizeChatGptChatStartUrl("https://evil.com/c/project/abc")).toThrow("https://chatgpt.com page");
+  expect(() => normalizeChatGptChatStartUrl("https://user:pass@chatgpt.com/c/project/abc")).toThrow("https://chatgpt.com page");
+  expect(() => normalizeChatGptChatStartUrl("https://chatgpt.com/?temporary-chat=true")).toThrow("must not force Temporary Chat");
 });
 
 test("composer and effort selectors exclude unrelated editable fields and menu buttons", () => {

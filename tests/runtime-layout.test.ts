@@ -319,6 +319,35 @@ test("conversation preferences survive reload; saved chats also apply to Zero Ri
   expect(() => loadConfig()).toThrow("useSavedChats");
 });
 
+test("a configured chat start URL round-trips into the provider and rejects conflicting modes", () => {
+  const root = join(tmpdir(), `codex-chat-start-url-config-${process.pid}-${Date.now()}`);
+  roots.push(root);
+  process.env.CODEX_CHATGPT_WEB_HOME = root;
+  mkdirSync(root, { recursive: true });
+  const config: Record<string, unknown> = { ...defaultConfig("browser-only") };
+  const persist = () => writeFileSync(join(root, "config.json"), JSON.stringify(config));
+  expect(config.chatStartUrl).toBeUndefined();
+  config.chatStartUrl = " https://chatgpt.com/c/project/round-trip ";
+  persist();
+  const loaded = loadConfig()!;
+  expect(loaded.chatStartUrl).toBe("https://chatgpt.com/c/project/round-trip");
+  expect(providerConfig(loaded).chatgptWeb!.chatStartUrl).toBe("https://chatgpt.com/c/project/round-trip");
+  config.useSavedChats = false;
+  persist();
+  expect(() => loadConfig()).toThrow("chatStartUrl requires useSavedChats");
+  config.useSavedChats = true;
+  config.chatStartUrl = "https://evil.com/c/project/round-trip";
+  persist();
+  expect(() => loadConfig()).toThrow("https://chatgpt.com page");
+  config.chatStartUrl = 42;
+  persist();
+  expect(() => loadConfig()).toThrow("Invalid chatStartUrl");
+  config.chatStartUrl = "";
+  persist();
+  expect(loadConfig()!.chatStartUrl).toBeUndefined();
+  expect(providerConfig(loadConfig()!).chatgptWeb!.chatStartUrl).toBeUndefined();
+});
+
 test("composer predictions default on for existing configurations and persist an explicit opt-out", () => {
   const root = join(tmpdir(), `codex-predictions-config-${process.pid}-${Date.now()}`);
   roots.push(root);

@@ -126,6 +126,10 @@ Settings can also cancel a retained browser turn or remove the Codex integration
 **Save chats in ChatGPT** keeps task conversations in ChatGPT history. On by default for new setups;
 independent of **New browser chat for each turn**. Existing explicit choices are preserved when
 updating. Turn it off to use Temporary Chat, where ChatGPT may not expose your connector.
+To start each turn on a specific ChatGPT surface such as a Project, set `chatStartUrl` in
+`~/.codex-chatgpt-web/config.json` to that page's full `https://chatgpt.com/...` URL. It requires
+saved chats, is validated against the ChatGPT origin, and each turn still opens a brand-new
+conversation on that page.
 Set `CODEX_CHATGPT_WEB_BROWSER_DIAGNOSTICS=1` only when every browser checkpoint needs a screenshot.
 
 New installs use **Compatibility V1** for cross-backend subagents. **Native** preserves Codex's own

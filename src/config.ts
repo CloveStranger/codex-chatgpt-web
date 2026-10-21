@@ -7,6 +7,7 @@ import {
   CHATGPT_WEB_ZERO_RISK_BACKEND_MODEL,
   CHATGPT_WEB_ZERO_RISK_PRO_BACKEND_MODEL,
 } from "./chatgpt-web-models";
+import { normalizeChatGptChatStartUrl } from "./chatgpt-session";
 import type { CodexProviderConfig } from "./types";
 import { VERSION } from "./version";
 
@@ -122,6 +123,8 @@ export interface AppConfig {
   experimentalSkillAttachments: boolean;
   experimentalFreshConversationPerTurn: boolean;
   useSavedChats: boolean;
+  /** Optional per-turn start surface inside https://chatgpt.com, for example a Project page. */
+  chatStartUrl?: string;
   /** Explicitly install the additional Pro-sized model row while Zero Risk is active. */
   zeroRiskProEnabled: boolean;
   /** Optional adapter-silence budget for the Responses watchdog. */
@@ -563,6 +566,18 @@ function parseConfig(value: unknown, path: string): AppConfig {
     throw new Error(`Invalid useSavedChats in ${path}`);
   }
   const useSavedChats = parsed.useSavedChats !== false;
+  let chatStartUrl: string | undefined;
+  if (parsed.chatStartUrl !== undefined) {
+    if (typeof parsed.chatStartUrl !== "string") {
+      throw new Error(`Invalid chatStartUrl in ${path}`);
+    }
+    chatStartUrl = parsed.chatStartUrl.trim() === ""
+      ? undefined
+      : normalizeChatGptChatStartUrl(parsed.chatStartUrl);
+  }
+  if (chatStartUrl && !useSavedChats) {
+    throw new Error(`chatStartUrl requires useSavedChats in ${path}`);
+  }
   if (browserInteractionMode === "manual" && experimentalSkillAttachments) {
     throw new Error(`Zero Risk does not support Skills as files in ${path}`);
   }
@@ -591,6 +606,7 @@ function parseConfig(value: unknown, path: string): AppConfig {
     experimentalSkillAttachments,
     experimentalFreshConversationPerTurn,
     useSavedChats,
+    chatStartUrl,
     zeroRiskProEnabled,
   } as AppConfig;
 }
@@ -649,6 +665,7 @@ export function providerConfig(config: AppConfig): CodexProviderConfig {
       experimentalSkillAttachments: manual ? false : config.experimentalSkillAttachments,
       experimentalFreshConversationPerTurn: !manual && config.experimentalFreshConversationPerTurn === true,
       useSavedChats: config.useSavedChats === true,
+      ...(config.chatStartUrl ? { chatStartUrl: config.chatStartUrl } : {}),
       ...(config.stallTimeoutSec !== undefined ? { stallTimeoutSec: config.stallTimeoutSec } : {}),
       autoApproveToolCalls: manual ? false : config.autoApproveToolCalls,
     },
